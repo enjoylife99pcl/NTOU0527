@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>墾丁海底 ROV 學習網</title>
+    <style>
+        /* =========================================
+           全域與漫畫風格設定
+           ========================================= */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Microsoft JhengHei', sans-serif;
+            background-color: #f0f8ff; /* 網頁底色 */
+            overflow-x: hidden;
+        }
+
+        /* 漫畫風格的共用邊框 */
+        .comic-box {
+            background-color: white;
+            border: 4px solid #222;
+            box-shadow: 6px 6px 0px #222;
+            border-radius: 10px;
+            color: #222;
+        }
+
+        /* =========================================
+           導覽列 (選單) 樣式
+           ========================================= */
+        .navbar {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            padding: 15px;
+            background-color: #ffcc00;
+            border-bottom: 4px solid #222;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-btn {
+            padding: 10px 20px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            background-color: white;
+            border: 3px solid #222;
+            border-radius: 8px;
+            box-shadow: 3px 3px 0px #222;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+
+        .nav-btn:hover {
+            background-color: #fff0b3;
+        }
+
+        .nav-btn:active, .nav-btn.active {
+            transform: translate(3px, 3px);
+            box-shadow: 0px 0px 0px #222;
+            background-color: #4facfe;
+            color: white;
+        }
+
+        /* =========================================
+           分頁控制 (核心：隱藏與顯示)
+           ========================================= */
+        .page {
+            display: none; /* 預設全部隱藏 */
+            padding: 20px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .page.active {
+            display: block; /* 只有加上 active 的分頁才會顯示 */
+        }
+
+        /* =========================================
+           1. 遊戲頁面專屬樣式 (修改自原版)
+           ========================================= */
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 70vh; /* 佔螢幕高度 70% */
+            background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.15) 2px, transparent 2px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.15) 2px, transparent 2px),
+                linear-gradient(to bottom, #4facfe 0%, #006b99 100%);
+            background-size: 40px 40px, 40px 40px, 100% 100%;
+            overflow: hidden;
+            border: 4px solid #222;
+            border-radius: 15px;
+            box-shadow: 8px 8px 0px #222;
+        }
+
+        .game-ui { position: absolute; z-index: 20; padding: 10px; }
+        #instructions { top: 10px; left: 10px; }
+        #score-board { top: 10px; right: 10px; font-size: 24px; }
+
+        .rov-wrapper {
+            position: absolute;
+            width: 120px; height: 80px;
+            transform-origin: center center;
+            z-index: 10;
+        }
+
+        .rov-image {
+            width: 100%; height: 100%;
+            background-image: url('https://media.istockphoto.com/id/1065890360/zh/%E7%85%A7%E7%89%87/%E6%B0%B4%E4%B8%8B%E6%A9%9F%E5%99%A8%E4%BA%BA%E6%8E%A2%E7%B4%A2%E6%B7%B1%E6%B5%B7.jpg?s=612x612&w=0&k=20&c=1UTDo_pU8RWOlsrxLHPFq-EtZibTudmTC1cvGreUtnY=');
+            background-size: cover; background-position: center;
+            border: 4px solid #222; border-radius: 15px;
+            box-shadow: 4px 4px 0px #222;
+        }
+
+        .light-beam {
+            position: absolute; top: 50%; left: 110px;
+            transform: translateY(-50%);
+            border-top: 80px solid transparent; border-bottom: 80px solid transparent;
+            border-left: 250px solid rgba(255, 255, 100, 0.7);
+            opacity: 0; pointer-events: none;
+            filter: drop-shadow(0 0 10px rgba(255,255,0,0.8));
+        }
+        .light-beam.active { opacity: 1; }
+
+        .trash {
+            position: absolute; font-size: 35px;
+            transform: translate(-50%, -50%);
+            transition: opacity 0.5s, transform 0.5s; z-index: 5;
+            filter: drop-shadow(3px 3px 2px rgba(0,0,0,0.6)) brightness(0.7) sepia(0.4);
+        }
+        .trash.cleared { transform: translate(-50%, -50%) scale(0) rotate(180deg); opacity: 0; }
+
+        .win-screen {
+            display: none; position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%); font-size: 40px;
+            text-align: center; z-index: 100; color: #ffcc00;
+            text-shadow: 3px 3px 0 #222, -3px -3px 0 #222, 3px -3px 0 #222, -3px 3px 0 #222;
+        }
+
+        /* =========================================
+           2. 浮力實驗室樣式
+           ========================================= */
+        .lab-container { display: flex; gap: 20px; align-items: center; justify-content: center;}
+        .water-tank {
+            width: 300px; height: 400px;
+            background: linear-gradient(to bottom, #a1c4fd 0%, #c2e9fb 100%);
+            border: 6px solid #222; border-radius: 10px;
+            position: relative; overflow: hidden;
+            box-shadow: inset 0px 0px 20px rgba(0,107,153,0.5), 8px 8px 0px #222;
+        }
+        #lab-rov {
+            position: absolute;
+            left: 90px; top: 160px; /* 預設在中間 */
+            transition: top 1s cubic-bezier(0.25, 0.8, 0.25, 1); /* 平滑移動動畫 */
+        }
+        .lab-controls { display: flex; flex-direction: column; gap: 15px; }
+        .control-btn {
+            font-size: 20px; padding: 15px; cursor: pointer;
+            border: 4px solid #222; border-radius: 10px; font-weight: bold;
+        }
+        .btn-heavy { background-color: #ff9999; }
+        .btn-light { background-color: #99ff99; }
+
+        /* =========================================
+           3. 知識區 & 4. 測驗區共用樣式
+           ========================================= */
+        .content-panel { padding: 30px; margin-bottom: 20px; line-height: 1.6; }
+        .content-panel h2 { margin-top: 0; color: #006b99; border-bottom: 3px dashed #222; padding-bottom: 10px;}
+        .quiz-question { margin-bottom: 20px; }
+        .quiz-question p { font-size: 18px; font-weight: bold; }
+        .quiz-question label { display: block; margin: 8px 0; font-size: 18px; cursor: pointer; }
+        .submit-btn {
+            font-size: 20px; padding: 10px 30px; background-color: #4facfe; color: white;
+            border: 4px solid #222; border-radius: 10px; cursor: pointer;
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- 頂部導覽列 -->
+    <nav class="navbar">
+        <button class="nav-btn active" onclick="switchPage('page-game', this)">🎮 淨海遊戲</button>
+        <button class="nav-btn" onclick="switchPage('page-buoyancy', this)">⚖️ 浮力實驗</button>
+        <button class="nav-btn" onclick="switchPage('page-knowledge', this)">📖 海洋知識</button>
+        <button class="nav-btn" onclick="switchPage('page-quiz', this)">📝 隨堂測驗</button>
+    </nav>
+
+    <!-- ==========================================
+         頁面 1：ROV 淨海遊戲 
+         ========================================== -->
+    <div id="page-game" class="page active">
+        <div id="game-container">
+            <div class="comic-box game-ui" id="instructions">
+                <h2 style="margin:0 0 5px 0; font-size: 20px;">任務：清除海洋垃圾</h2>
+                <p style="margin:0; font-size: 14px;">方向鍵 ⬆⬇⬅➡ 移動<br>按住「空白鍵」開燈消除垃圾！</p>
+            </div>
+            <div class="comic-box game-ui" id="score-board">分數: 0</div>
+            
+            <div class="rov-wrapper" id="game-rov-wrapper">
+                <div class="light-beam" id="game-beam"></div>
+                <div class="rov-image"></div>
+            </div>
+            
+            <div id="trash-container"></div>
+            <div class="win-screen" id="win-screen">🎉 墾丁海洋有你真好！ 🎉</div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         頁面 2：ROV 運作原理－浮力實驗 
+         ========================================== -->
+    <div id="page-buoyancy" class="page">
+        <div class="comic-box content-panel text-center">
+            <h2>ROV 是如何潛水和上浮的？ (阿基米德浮力原理)</h2>
+            <p>ROV 內部有特殊的「壓艙水箱」。當水箱充滿空氣時，ROV 比水輕，就會**上浮**；當水箱注滿海水時，ROV 變重，就會**下沉**！</p>
+            <p>請點擊右方的按鈕，觀察 ROV 的浮沉變化。</p>
+            
+            <div class="lab-container">
+                <!-- 水箱與 ROV -->
+                <div class="water-tank">
+                    <div class="rov-wrapper" id="lab-rov">
+                        <div class="rov-image"></div>
+                    </div>
+                </div>
+                <!-- 控制按鈕 -->
+                <div class="lab-controls">
+                    <button class="control-btn btn-light" onclick="changeBuoyancy(-80)">💨 充入空氣 (變輕上浮)</button>
+                    <button class="control-btn btn-heavy" onclick="changeBuoyancy(80)">💧 注入海水 (變重下沉)</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         頁面 3：海洋垃圾知識教學 
+         ========================================== -->
+    <div id="page-knowledge" class="page">
+        <div class="comic-box content-panel">
+            <h2>什麼是海洋廢棄物 (海洋垃圾)？</h2>
+            <p>海洋廢棄物是指被人類丟棄，最後流入海中的人造物。在墾丁美麗的珊瑚礁海域中，最常見的垃圾有：</p>
+            <ul>
+                <li>🛍️ <b>塑膠袋與塑膠瓶：</b> 海龜常常把塑膠袋誤認為水母吃掉，導致生病。</li>
+                <li>🕸️ <b>廢棄漁網 (幽靈漁網)：</b> 會纏住珊瑚和魚類，是海底的隱形殺手。</li>
+                <li>🩴 <b>各式民生垃圾：</b> 拖鞋、鐵罐、玻璃瓶等。</li>
+            </ul>
+            <h2>ROV 能幫上什麼忙？</h2>
+            <p>人類潛水員有深度和時間的限制，但是 ROV (水下遙控載具) 不怕水壓也不用呼吸！它可以潛入深海，用攝影機尋找垃圾，甚至用機械手臂把沉重的垃圾夾回水面。</p>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         頁面 4：隨堂測驗 
+         ========================================== -->
+    <div id="page-quiz" class="page">
+        <div class="comic-box content-panel">
+            <h2>📝 淨海小尖兵隨堂測驗</h2>
+            <form id="quiz-form">
+                <div class="quiz-question">
+                    <p>1. ROV 是靠改變什麼來控制在水中的上浮與下沉？</p>
+                    <label><input type="radio" name="q1" value="A"> A. 改變推進器的顏色</label>
+                    <label><input type="radio" name="q1" value="B"> B. 改變自身的重量 (注水或排水)</label>
+                    <label><input type="radio" name="q1" value="C"> C. 播放音樂讓魚幫忙推</label>
+                </div>
+                <div class="quiz-question">
+                    <p>2. 下列哪一種是墾丁海域常見且危險的海洋垃圾？</p>
+                    <label><input type="radio" name="q2" value="A"> A. 廢棄塑膠袋與漁網</label>
+                    <label><input type="radio" name="q2" value="B"> B. 掉落的天然海帶</label>
+                    <label><input type="radio" name="q2" value="C"> C. 珊瑚的碎片</label>
+                </div>
+                <div class="quiz-question">
+                    <p>3. 身為國小學生的我們，可以怎麼幫助海洋？</p>
+                    <label><input type="radio" name="q3" value="A"> A. 買一台真實的 ROV 去撿垃圾</label>
+                    <label><input type="radio" name="q3" value="B"> B. 把垃圾丟進水溝，讓它流進大海</label>
+                    <label><input type="radio" name="q3" value="C"> C. 從生活中減少使用一次性塑膠產品</label>
+                </div>
+                <button type="button" class="submit-btn" onclick="checkQuiz()">送出答案</button>
+            </form>
+            <h3 id="quiz-result" style="color: red; margin-top: 20px;"></h3>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         JavaScript 邏輯控制區
+         ========================================== -->
+    <script>
+        // ==========================================
+        // 模組一：SPA 分頁切換邏輯
+        // ==========================================
+        let currentPageId = 'page-game'; // 紀錄現在在看哪一頁
+
+        function switchPage(pageId, btnElement) {
+            currentPageId = pageId;
+
+            // 1. 隱藏所有頁面
+            const pages = document.querySelectorAll('.page');
+            pages.forEach(page => page.classList.remove('active'));
+
+            // 2. 顯示目標頁面
+            document.getElementById(pageId).classList.add('active');
+
+            // 3. 更新按鈕的顏色狀態
+            const btns = document.querySelectorAll('.nav-btn');
+            btns.forEach(btn => btn.classList.remove('active'));
+            btnElement.classList.add('active');
+        }
+
+        // ==========================================
+        // 模組二：浮力實驗室邏輯
+        // ==========================================
+        let currentDepth = 160; // 初始深度 (相對於水箱的 top px)
+
+        function changeBuoyancy(amount) {
+            currentDepth += amount;
+            
+            // 限制移動範圍，不讓 ROV 跑出水箱
+            if(currentDepth < 10) currentDepth = 10;   // 最上面
+            if(currentDepth > 310) currentDepth = 310; // 最下面
+            
+            // 透過修改 CSS 的 top 屬性來移動
+            document.getElementById('lab-rov').style.top = currentDepth + 'px';
+        }
+
+        // ==========================================
+        // 模組三：隨堂測驗邏輯
+        // ==========================================
+        function checkQuiz() {
+            let score = 0;
+            const form = document.getElementById('quiz-form');
+            const resultDisplay = document.getElementById('quiz-result');
+
+            // 取得使用者選的答案
+            const ans1 = form.q1.value;
+            const ans2 = form.q2.value;
+            const ans3 = form.q3.value;
+
+            // 檢查是否都有作答
+            if(!ans1 || !ans2 || !ans3) {
+                resultDisplay.innerText = "⚠️ 請回答完所有問題喔！";
+                resultDisplay.style.color = "red";
+                return;
+            }
+
+            // 正確解答判定
+            if(ans1 === 'B') score += 100/3;
+            if(ans2 === 'A') score += 100/3;
+            if(ans3 === 'C') score += 100/3;
+
+            score = Math.round(score); // 四捨五入
+
+            if(score === 100) {
+                resultDisplay.innerText = `🎉 太棒了！您獲得了 ${score} 分！您是真正的淨海小尖兵！`;
+                resultDisplay.style.color = "green";
+            } else {
+                resultDisplay.innerText = `👍 很好！您獲得了 ${score} 分！再複習一下知識區，挑戰滿分吧！`;
+                resultDisplay.style.color = "#006b99";
+            }
+        }
+
+        // ==========================================
+        // 模組四：ROV 遊戲邏輯 (整合之前的程式)
+        // ==========================================
+        let gameScore = 0;
+        const targetScore = 10;
+        const gameContainer = document.getElementById('game-container');
+        
+        // 為了讓 ROV 在容器內移動，我們需要抓取容器的寬高
+        let containerWidth = gameContainer.clientWidth;
+        let containerHeight = gameContainer.clientHeight;
+        
+        let rovX = containerWidth / 2;
+        let rovY = containerHeight / 2;
+        const rovSpeed = 6;
+        let rovDirection = 1; 
+        
+        const keys = {};
+        let trashesData = [];
+        const trashIcons = ['🍾', '🥫', '🛍️', '🛢️', '🩴']; 
+
+        const rovWrapper = document.getElementById('game-rov-wrapper');
+        const beamElement = document.getElementById('game-beam');
+        const scoreDisplay = document.getElementById('score-board');
+        const trashContainer = document.getElementById('trash-container');
+        const winScreen = document.getElementById('win-screen');
+
+        window.addEventListener('keydown', e => keys[e.code] = true);
+        window.addEventListener('keyup', e => keys[e.code] = false);
+
+        // 當視窗大小改變時，重新計算遊戲區塊大小
+        window.addEventListener('resize', () => {
+            containerWidth = gameContainer.clientWidth;
+            containerHeight = gameContainer.clientHeight;
+        });
+
+        function spawnSingleTrash() {
+            let trashEl = document.createElement('div');
+            trashEl.className = 'trash';
+            trashEl.innerText = trashIcons[Math.floor(Math.random() * trashIcons.length)];
+
+            // 限制在容器範圍內產生
+            let randomX = 50 + Math.random() * (containerWidth - 100);
+            let randomY = 50 + Math.random() * (containerHeight - 100);
+
+            trashEl.style.left = randomX + 'px';
+            trashEl.style.top = randomY + 'px';
+
+            trashContainer.appendChild(trashEl);
+            trashesData.push({ element: trashEl, x: randomX, y: randomY });
+        }
+
+        for(let i = 0; i < 3; i++) spawnSingleTrash();
+
+        setInterval(function() {
+            // 只有在遊戲頁面時才生成垃圾，避免資源浪費
+            if (currentPageId === 'page-game' && trashesData.length < 5) {
+                spawnSingleTrash();
+            }
+        }, 2500);
+
+        function checkCollision() {
+            for (let i = trashesData.length - 1; i >= 0; i--) {
+                let trash = trashesData[i];
+                let dx = trash.x - rovX;
+                let dy = trash.y - rovY;
+                let isInLight = false;
+
+                if (rovDirection === 1 && dx > 0 && dx < 250) isInLight = true;
+                else if (rovDirection === -1 && dx < 0 && dx > -250) isInLight = true;
+
+                let isHeightMatch = Math.abs(dy) < 80;
+
+                if (isInLight && isHeightMatch) {
+                    gameScore++;
+                    scoreDisplay.innerText = '分數: ' + gameScore;
+                    trash.element.classList.add('cleared');
+                    setTimeout(() => trash.element.remove(), 500);
+                    trashesData.splice(i, 1);
+
+                    if (gameScore >= targetScore) {
+                        winScreen.style.display = 'block';
+                    }
+                }
+            }
+        }
+
+        function gameLoop() {
+            // ⭐ 關鍵：只有在「遊戲頁面」打開時，才允許玩家操作與判定！
+            if (currentPageId === 'page-game') {
+                if (keys['ArrowUp'] && rovY > 40) rovY -= rovSpeed;
+                if (keys['ArrowDown'] && rovY < containerHeight - 40) rovY += rovSpeed;
+                if (keys['ArrowLeft'] && rovX > 60) {
+                    rovX -= rovSpeed;
+                    rovDirection = -1;
+                }
+                if (keys['ArrowRight'] && rovX < containerWidth - 60) {
+                    rovX += rovSpeed;
+                    rovDirection = 1;
+                }
+
+                if (keys['Space']) {
+                    beamElement.classList.add('active');
+                    checkCollision();
+                } else {
+                    beamElement.classList.remove('active');
+                }
+
+                rovWrapper.style.left = rovX + 'px';
+                rovWrapper.style.top = rovY + 'px';
+                rovWrapper.style.transform = `translate(-50%, -50%) scaleX(${rovDirection})`;
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        requestAnimationFrame(gameLoop);
+
+    </script>
+</body>
+</html>
