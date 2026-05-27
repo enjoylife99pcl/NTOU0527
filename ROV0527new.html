@@ -106,16 +106,46 @@
             z-index: 10;
         }
 
+        /* 改回簡易漫畫版 ROV，方便辨識方向 */
         .rov-image {
             width: 100%; height: 100%;
-            background-image: url('https://media.istockphoto.com/id/1065890360/zh/%E7%85%A7%E7%89%87/%E6%B0%B4%E4%B8%8B%E6%A9%9F%E5%99%A8%E4%BA%BA%E6%8E%A2%E7%B4%A2%E6%B7%B1%E6%B5%B7.jpg?s=612x612&w=0&k=20&c=1UTDo_pU8RWOlsrxLHPFq-EtZibTudmTC1cvGreUtnY=');
-            background-size: cover; background-position: center;
-            border: 4px solid #222; border-radius: 15px;
+            background-color: #ffcc00; /* 明亮的黃色機身 */
+            border: 4px solid #222; 
+            border-radius: 20px 40px 40px 20px; /* 右邊(頭部)較圓，左邊(尾部)較平 */
             box-shadow: 4px 4px 0px #222;
+            position: relative;
+        }
+        
+        /* 繪製左邊的推進器 (車尾) */
+        .rov-image::before {
+            content: '';
+            position: absolute;
+            left: -15px;
+            top: 15px;
+            width: 20px;
+            height: 40px;
+            background-color: #888;
+            border: 4px solid #222;
+            border-radius: 5px;
+            box-shadow: inset -2px -2px 0px rgba(0,0,0,0.3);
+        }
+
+        /* 繪製右邊的頭燈/攝影機 (車頭) */
+        .rov-image::after {
+            content: '';
+            position: absolute;
+            right: -10px;
+            top: 20px;
+            width: 20px;
+            height: 30px;
+            background-color: #e0f7fa; /* 像玻璃的反光感 */
+            border: 4px solid #222;
+            border-radius: 8px;
+            box-shadow: inset -3px -3px 0px rgba(0,0,0,0.2);
         }
 
         .light-beam {
-            position: absolute; top: 50%; left: 110px;
+            position: absolute; top: 50%; left: 125px; /* 從頭燈前方發射 */
             transform: translateY(-50%);
             border-top: 80px solid transparent; border-bottom: 80px solid transparent;
             border-left: 250px solid rgba(255, 255, 100, 0.7);
